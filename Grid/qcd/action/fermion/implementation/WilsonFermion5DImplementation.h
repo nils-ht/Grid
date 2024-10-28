@@ -741,6 +741,15 @@ void WilsonFermion5D<Impl>::MomentumSpacePropagatorHt(FermionField &out,const Fe
 template<class Impl>
 void WilsonFermion5D<Impl>::MomentumSpacePropagatorHw(FermionField &out,const FermionField &in,RealD mass,std::vector<double> twist)
 {
+  std::vector<double> empty_q(Nd,0.0);
+  MomentumSpacePropagatorHwQ(out,in,mass,twist,empty_q);
+}
+template<class Impl>
+void WilsonFermion5D<Impl>::MomentumSpacePropagatorHwQ(FermionField &out,const FermionField &in,
+						       RealD mass,
+						       std::vector<double> twist,
+						       std::vector<double> qmu)
+{
     Gamma::Algebra Gmu [] = {
       Gamma::Algebra::GammaX,
       Gamma::Algebra::GammaY,
@@ -755,6 +764,7 @@ void WilsonFermion5D<Impl>::MomentumSpacePropagatorHw(FermionField &out,const Fe
     typedef typename FermionField::scalar_type ScalComplex;
 
     typedef Lattice<iSinglet<vector_type> > LatComplex;
+    typedef iSpinMatrix<ScalComplex> SpinMat;
 
 
     Coordinate latt_size   = _grid->_fdimensions;
@@ -772,8 +782,10 @@ void WilsonFermion5D<Impl>::MomentumSpacePropagatorHw(FermionField &out,const Fe
     LatComplex kmu(_grid); 
     ScalComplex ci(0.0,1.0);
 
+    std::cout<< "Feynman Rule" << "qmu ("<<qmu[0]<<","<<qmu[1]<<","<<qmu[2]<<","<<qmu[3]<<")"<<std::endl;
+    
     for(int mu=0;mu<Nd;mu++) {
-
+      
       LatticeCoordinate(kmu,mu);
 
       RealD TwoPiL =  M_PI * 2.0/ latt_size[mu];
@@ -782,9 +794,18 @@ void WilsonFermion5D<Impl>::MomentumSpacePropagatorHw(FermionField &out,const Fe
       kmu = kmu + TwoPiL * one * twist[mu];//momentum for twisted boundary conditions
 
       sk2 = sk2 + 2.0*sin(kmu*0.5)*sin(kmu*0.5);
-      sk  = sk  + sin(kmu)*sin(kmu); 
 
-      num = num - sin(kmu)*ci*(Gamma(Gmu[mu])*in);
+      sk = sk + (sin(kmu)+qmu[mu])*(sin(kmu)+qmu[mu]); 
+
+      // Terms for boosted Fermion
+      // 1/2 [ -i gamma.(sin p + q )     ]
+      //     [ --------------------- + 1 ]
+      //     [         wq + b            ]
+      //
+      // wq = sqrt( (sinp+q)^2 + b^2 )
+      //
+      
+      num = num - (sin(kmu)+qmu[mu])*ci*(Gamma(Gmu[mu])*in);
 
     }
     num = num + mass * in ;

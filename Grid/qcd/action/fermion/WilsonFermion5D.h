@@ -109,6 +109,8 @@ public:
   void MomentumSpacePropagatorHt_5d(FermionField &out,const FermionField &in,RealD mass,std::vector<double> twist) ;
   void MomentumSpacePropagatorHt(FermionField &out,const FermionField &in,RealD mass,std::vector<double> twist) ;
   void MomentumSpacePropagatorHw(FermionField &out,const FermionField &in,RealD mass,std::vector<double> twist) ;
+  void MomentumSpacePropagatorHwQ(FermionField &out,const FermionField &in,RealD mass,std::vector<double> twist,
+				  std::vector<double> qmu) ;
 
   // Implement hopping term non-hermitian hopping term; half cb or both
   // Implement s-diagonal DW
