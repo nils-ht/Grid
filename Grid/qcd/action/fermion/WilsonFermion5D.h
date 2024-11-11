@@ -119,6 +119,9 @@ public:
   void DhopOE(const FermionField &in, FermionField &out,int dag);
   void DhopEO(const FermionField &in, FermionField &out,int dag);
 
+  void DhopComms  (const FermionField &in, FermionField &out);
+  void DhopCalc   (const FermionField &in, FermionField &out,uint64_t *ids);
+  
   // add a DhopComm
   // -- suboptimal interface will presently trigger multiple comms.
   void DhopDir(const FermionField &in, FermionField &out,int dir,int disp);

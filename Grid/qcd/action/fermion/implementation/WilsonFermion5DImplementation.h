@@ -439,6 +439,29 @@ void WilsonFermion5D<Impl>::DhopEO(const FermionField &in, FermionField &out,int
   DhopInternal(StencilOdd,UmuEven,in,out,dag);
 }
 template<class Impl>
+void WilsonFermion5D<Impl>::DhopComms(const FermionField &in, FermionField &out)
+{
+  int dag =0 ;
+  conformable(in.Grid(),FermionGrid()); // verifies full grid
+  conformable(in.Grid(),out.Grid());
+  out.Checkerboard() = in.Checkerboard();
+  Compressor compressor(dag);
+  Stencil.HaloExchangeOpt(in,compressor);
+}
+template<class Impl>
+void WilsonFermion5D<Impl>::DhopCalc(const FermionField &in, FermionField &out,uint64_t *ids)
+{
+  conformable(in.Grid(),FermionGrid()); // verifies full grid
+  conformable(in.Grid(),out.Grid());
+
+  out.Checkerboard() = in.Checkerboard();
+
+  int LLs = in.Grid()->_rdimensions[0];
+  int Opt = WilsonKernelsStatic::Opt;
+  Kernels::DhopKernel(Opt,Stencil,Umu,Stencil.CommBuf(),LLs,Umu.oSites(),in,out,ids);
+}
+
+template<class Impl>
 void WilsonFermion5D<Impl>::Dhop(const FermionField &in, FermionField &out,int dag)
 {
   conformable(in.Grid(),FermionGrid()); // verifies full grid
