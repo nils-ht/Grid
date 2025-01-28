@@ -42,6 +42,11 @@ Author: Christoph Lehner <christoph@lhnr.de>
 #ifdef ACCELERATOR_AWARE_MPI
 #define GRID_SYCL_LEVEL_ZERO_IPC
 #define SHM_SOCKETS
+#else
+#undef NUMA_PLACE_HOSTBUF
+#ifdef NUMA_PLACE_HOSTBUF
+#include <numaif.h>
+#endif 
 #endif 
 #include <syscall.h>
 #endif
@@ -537,7 +542,30 @@ void GlobalSharedMemory::SharedMemoryAllocate(uint64_t bytes, int flags)
   // Each MPI rank should allocate our own buffer
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef ACCELERATOR_AWARE_MPI
+  printf("Host buffer allocate for GPU non-aware MPI\n");
   HostCommBuf= malloc(bytes);
+#ifdef NUMA_PLACE_HOSTBUF
+  int numa;
+  char *numa_name=(char *)getenv("MPI_BUF_NUMA");
+  if(numa_name) {
+    page_size = sysconf(_SC_PAGESIZE);
+    numa = atoi(numa_name);
+    unsigned long page_count = bytes/page_size;
+    std::vector<void *> pages(pcount);
+    std::vector<int>    nodes(pcount,numa);
+    std::vector<int>    status(pcount,-1);
+    for(unsigned long p=0;p<page_count;p++){
+      pages[p] = HostCommBuf + p*page_size;
+    }
+    int ret = move_pages(0,
+			 page_count,
+			 &pages[0],
+			 &nodes[0],
+			 &status[0],
+			 MPOL_MF_MOVE);
+    printf("Host buffer move to numa domain %d : move_pages returned %d\n",numa,ret);
+    if (ret) perror(" move_pages failed for reason:");
+#endif  
 #endif  
   ShmCommBuf = acceleratorAllocDevice(bytes);
   if (ShmCommBuf == (void *)NULL ) {
