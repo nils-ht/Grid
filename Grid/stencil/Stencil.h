@@ -368,7 +368,6 @@ public:
     //    accelerator_barrier();     // All kernels should ALREADY be complete
     //    _grid->StencilBarrier();   // Everyone is here, so noone running slow and still using receive buffer
                                // But the HaloGather had a barrier too.
-#ifdef ACCELERATOR_AWARE_MPI
     for(int i=0;i<Packets.size();i++){
       _grid->StencilSendToRecvFromBegin(MpiReqs,
 					Packets[i].send_buf,
@@ -377,23 +376,6 @@ public:
 					Packets[i].from_rank,Packets[i].do_recv,
 					Packets[i].xbytes,Packets[i].rbytes,i);
     }
-#else
-#warning "Using COPY VIA HOST BUFFERS IN STENCIL"
-    for(int i=0;i<Packets.size();i++){
-      // Introduce a host buffer with a cheap slab allocator and zero cost wipe all
-      Packets[i].host_send_buf = _grid->HostBufferMalloc(Packets[i].xbytes);
-      Packets[i].host_recv_buf = _grid->HostBufferMalloc(Packets[i].rbytes);
-      if ( Packets[i].do_send ) {
-	acceleratorCopyFromDevice(Packets[i].send_buf, Packets[i].host_send_buf,Packets[i].xbytes);
-      }
-      _grid->StencilSendToRecvFromBegin(MpiReqs,
-					Packets[i].host_send_buf,
-					Packets[i].to_rank,Packets[i].do_send,
-					Packets[i].host_recv_buf,
-					Packets[i].from_rank,Packets[i].do_recv,
-					Packets[i].xbytes,Packets[i].rbytes,i);
-    }
-#endif
     // Get comms started then run checksums
     // Having this PRIOR to the dslash seems to make Sunspot work... (!)
     for(int i=0;i<Packets.size();i++){
@@ -411,15 +393,6 @@ public:
     else DslashLogFull();
     //    acceleratorCopySynchronise();// is in the StencilSendToRecvFromComplete
     //    accelerator_barrier(); 
-#ifndef ACCELERATOR_AWARE_MPI
-#warning "Using COPY VIA HOST BUFFERS IN STENCIL"
-    for(int i=0;i<Packets.size();i++){
-      if ( Packets[i].do_recv ) {
-	acceleratorCopyToDevice(Packets[i].host_recv_buf, Packets[i].recv_buf,Packets[i].rbytes);
-      }
-    }
-    _grid->HostBufferFreeAll();
-#endif    // run any checksums
     _grid->StencilBarrier(); 
     for(int i=0;i<Packets.size();i++){
       if ( Packets[i].do_recv )

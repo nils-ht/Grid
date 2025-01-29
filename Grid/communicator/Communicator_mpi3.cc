@@ -317,7 +317,7 @@ void CartesianCommunicator::GlobalSumVector(double *d,int N)
   assert(ierr==0);
 }
 
-void CartesianCommunicator::SendToRecvFromBegin(std::vector<CommsRequest_t> &list,
+void CartesianCommunicator::SendToRecvFromBegin(std::vector<MpiCommsRequest_t> &list,
 						void *xmit,
 						int dest,
 						void *recv,
@@ -342,7 +342,7 @@ void CartesianCommunicator::SendToRecvFromBegin(std::vector<CommsRequest_t> &lis
   assert(ierr==0);
   list.push_back(xrq);
 }
-void CartesianCommunicator::CommsComplete(std::vector<CommsRequest_t> &list)
+void CartesianCommunicator::CommsComplete(std::vector<MpiCommsRequest_t> &list)
 {
   int nreq=list.size();
 
@@ -361,7 +361,7 @@ void CartesianCommunicator::SendToRecvFrom(void *xmit,
 					   int from,
 					   int bytes)
 {
-  std::vector<CommsRequest_t> reqs(0);
+  std::vector<MpiCommsRequest_t> reqs(0);
   unsigned long  xcrc = crc32(0L, Z_NULL, 0);
   unsigned long  rcrc = crc32(0L, Z_NULL, 0);
 
@@ -404,6 +404,29 @@ double CartesianCommunicator::StencilSendToRecvFromBegin(std::vector<CommsReques
 							 int from,int dor,
 							 int xbytes,int rbytes,int dir)
 {
+/*
+ * Bring sequence from Stencil.h down to lower level.
+ * Assume using XeLink is ok
+#warning "Using COPY VIA HOST BUFFERS IN STENCIL"
+      // Introduce a host buffer with a cheap slab allocator and zero cost wipe all
+      Packets[i].host_send_buf = _grid->HostBufferMalloc(Packets[i].xbytes);
+      Packets[i].host_recv_buf = _grid->HostBufferMalloc(Packets[i].rbytes);
+      if ( Packets[i].do_send ) {
+	acceleratorCopyFromDevice(Packets[i].send_buf, Packets[i].host_send_buf,Packets[i].xbytes);
+      }
+      _grid->StencilSendToRecvFromBegin(MpiReqs,
+					Packets[i].host_send_buf,
+					Packets[i].to_rank,Packets[i].do_send,
+					Packets[i].host_recv_buf,
+					Packets[i].from_rank,Packets[i].do_recv,
+					Packets[i].xbytes,Packets[i].rbytes,i);
+    }
+    for(int i=0;i<Packets.size();i++){
+      if ( Packets[i].do_recv ) {
+      }
+    }
+    _grid->HostBufferFreeAll();
+*/  
   int ncomm  =communicator_halo.size();
   int commdir=dir%ncomm;
 
@@ -421,28 +444,60 @@ double CartesianCommunicator::StencilSendToRecvFromBegin(std::vector<CommsReques
   double off_node_bytes=0.0;
   int tag;
 
+  void * host_recv = NULL;
+  void * host_xmit = NULL;
+
   if ( dor ) {
     if ( (gfrom ==MPI_UNDEFINED) || Stencil_force_mpi ) {
       tag= dir+from*32;
+#ifdef ACCELERATOR_AWARE_MPI
       ierr=MPI_Irecv(recv, rbytes, MPI_CHAR,from,tag,communicator_halo[commdir],&rrq);
       assert(ierr==0);
       list.push_back(rrq);
+#else
+      host_recv = this->HostBufferMalloc(rbytes);
+      ierr=MPI_Irecv(host_recv, rbytes, MPI_CHAR,from,tag,communicator_halo[commdir],&rrq);
+      assert(ierr==0);
+      CommsRequest_t srq;
+      srq.PacketType = InterNodeRecv;
+      srq.bytes      = rbytes;
+      srq.req        = rrq;
+      srq.host_buf   = host_recv;
+      srq.device_buf = recv;
+      list.push_back(srq);
+#endif
       off_node_bytes+=rbytes;
-    }
+    } else{ 
 #ifdef NVLINK_GET
       void *shm = (void *) this->ShmBufferTranslate(from,xmit);
       assert(shm!=NULL);
       acceleratorCopyDeviceToDeviceAsynch(shm,recv,rbytes);
 #endif
+    }
   }
   
   if (dox) {
     //  rcrc = crc32(rcrc,(unsigned char *)recv,bytes);
     if ( (gdest == MPI_UNDEFINED) || Stencil_force_mpi ) {
       tag= dir+_processor*32;
+#ifdef ACCELERATOR_AWARE_MPI
       ierr =MPI_Isend(xmit, xbytes, MPI_CHAR,dest,tag,communicator_halo[commdir],&xrq);
       assert(ierr==0);
       list.push_back(xrq);
+#else
+      std::cout << " send via host bounce "<<std::endl;
+      host_xmit = this->HostBufferMalloc(xbytes);
+      acceleratorCopyFromDevice(xmit, host_xmit,xbytes);
+      ierr =MPI_Isend(host_xmit, xbytes, MPI_CHAR,dest,tag,communicator_halo[commdir],&xrq);
+      assert(ierr==0);
+      CommsRequest_t srq;
+      srq.PacketType = InterNodeXmit;
+      srq.bytes      = xbytes;
+      srq.req        = xrq;
+      srq.host_buf   = host_xmit;
+      srq.device_buf = xmit;
+      list.push_back(srq);
+#endif
       off_node_bytes+=xbytes;
     } else {
 #ifndef NVLINK_GET
@@ -463,11 +518,25 @@ void CartesianCommunicator::StencilSendToRecvFromComplete(std::vector<CommsReque
   acceleratorCopySynchronise();
 
   if (nreq==0) return;
-
+#ifdef ACCELERATOR_AWARE_MPI
   std::vector<MPI_Status> status(nreq);
   int ierr = MPI_Waitall(nreq,&list[0],&status[0]);
   assert(ierr==0);
   list.resize(0);
+#else
+  // Wait individually and immediately copy receives to device
+  // Promition to Asynch copy and single wait is easy
+  MPI_Status status;
+  for(int r=0;r<nreq;r++){
+    int ierr = MPI_Wait(&list[r].req,&status);
+    assert(ierr==0);
+    if ( list[r].PacketType==InterNodeRecv ) {
+      acceleratorCopyToDevice(list[r].host_buf,list[r].device_buf,list[r].bytes);
+    }
+  }
+  list.resize(0);
+  this->HostBufferFreeAll();
+#endif
 }
 void CartesianCommunicator::StencilBarrier(void)
 {

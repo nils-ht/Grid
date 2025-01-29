@@ -29,7 +29,7 @@ export MPICH_OFI_NIC_POLICY=GPU
 
 CMD="mpiexec -np 12 -ppn 12  -envall \
 	     ./gpu_tile.sh ./Benchmark_dwf_fp32 --mpi 2.1.2.3 --grid 32.32.64.96 \
-		--shm-mpi 1 --shm 2048 --device-mem 32000 --accelerator-threads 8 "
+		--shm-mpi 0 --shm 2048 --device-mem 32000 --accelerator-threads 8 "
 
 echo $CMD
 $CMD

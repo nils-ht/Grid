@@ -543,7 +543,7 @@ void GlobalSharedMemory::SharedMemoryAllocate(uint64_t bytes, int flags)
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef ACCELERATOR_AWARE_MPI
   printf("Host buffer allocate for GPU non-aware MPI\n");
-  HostCommBuf= malloc(bytes);
+  HostCommBuf= malloc(bytes); /// CHANGE THIS TO malloc_host
 #ifdef NUMA_PLACE_HOSTBUF
   int numa;
   char *numa_name=(char *)getenv("MPI_BUF_NUMA");
