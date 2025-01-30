@@ -186,6 +186,12 @@ public:
 			       int recv_from_rank,int do_recv,
 			       int bytes,int dir);
 
+  double StencilSendToRecvFromPrepare(std::vector<CommsRequest_t> &list,
+				      void *xmit,
+				      int xmit_to_rank,int do_xmit,
+				      void *recv,
+				      int recv_from_rank,int do_recv,
+				      int xbytes,int rbytes,int dir);
   double StencilSendToRecvFromBegin(std::vector<CommsRequest_t> &list,
 				    void *xmit,
 				    int xmit_to_rank,int do_xmit,

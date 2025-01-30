@@ -327,7 +327,10 @@ inline void acceleratorFreeShared(void *ptr){free(ptr,*theGridAccelerator);};
 inline void acceleratorFreeDevice(void *ptr){free(ptr,*theGridAccelerator);};
 
 inline void acceleratorCopySynchronise(void) {  theCopyAccelerator->wait(); }
+
 inline void acceleratorCopyDeviceToDeviceAsynch(void *from,void *to,size_t bytes)  {  theCopyAccelerator->memcpy(to,from,bytes);}
+inline void acceleratorCopyToDeviceAsynch(void *from,void *to,size_t bytes)  { theCopyAccelerator->memcpy(to,from,bytes); }
+inline void acceleratorCopyFromDeviceAsynch(void *from,void *to,size_t bytes){ theCopyAccelerator->memcpy(to,from,bytes); }
 inline void acceleratorCopyToDevice(void *from,void *to,size_t bytes)  { theCopyAccelerator->memcpy(to,from,bytes); theCopyAccelerator->wait();}
 inline void acceleratorCopyFromDevice(void *from,void *to,size_t bytes){ theCopyAccelerator->memcpy(to,from,bytes); theCopyAccelerator->wait();}
 inline void acceleratorMemSet(void *base,int value,size_t bytes) { theCopyAccelerator->memset(base,value,bytes); theCopyAccelerator->wait();}
@@ -465,8 +468,7 @@ inline void acceleratorFreeShared(void *ptr){ auto discard=hipFree(ptr);};
 inline void acceleratorFreeDevice(void *ptr){ auto discard=hipFree(ptr);};
 inline void acceleratorCopyToDevice(void *from,void *to,size_t bytes)  { auto discard=hipMemcpy(to,from,bytes, hipMemcpyHostToDevice);}
 inline void acceleratorCopyFromDevice(void *from,void *to,size_t bytes){ auto discard=hipMemcpy(to,from,bytes, hipMemcpyDeviceToHost);}
-//inline void acceleratorCopyDeviceToDeviceAsynch(void *from,void *to,size_t bytes)  { hipMemcpy(to,from,bytes, hipMemcpyDeviceToDevice);}
-//inline void acceleratorCopySynchronise(void) {  }
+
 inline void acceleratorMemSet(void *base,int value,size_t bytes) { auto discard=hipMemset(base,value,bytes);}
 
 inline void acceleratorCopyDeviceToDeviceAsynch(void *from,void *to,size_t bytes) // Asynch
@@ -482,6 +484,13 @@ inline void acceleratorCopyFromDeviceAsync(void *from, void *to, size_t bytes, h
 inline void acceleratorCopySynchronise(void) { auto discard=hipStreamSynchronize(copyStream); };
 
 #endif
+
+inline void acceleratorPin(void *ptr,unsigned long bytes)
+{
+#ifdef GRID_SYCL
+  sycl::ext::oneapi::experimental::prepare_for_device_copy(ptr,bytes,theCopyAccelerator->get_context());
+#endif
+}
 
 //////////////////////////////////////////////
 // Common on all GPU targets

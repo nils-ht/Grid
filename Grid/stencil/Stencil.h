@@ -369,6 +369,14 @@ public:
     //    _grid->StencilBarrier();   // Everyone is here, so noone running slow and still using receive buffer
                                // But the HaloGather had a barrier too.
     for(int i=0;i<Packets.size();i++){
+      _grid->StencilSendToRecvFromPrepare(MpiReqs,
+					  Packets[i].send_buf,
+					  Packets[i].to_rank,Packets[i].do_send,
+					  Packets[i].recv_buf,
+					  Packets[i].from_rank,Packets[i].do_recv,
+					  Packets[i].xbytes,Packets[i].rbytes,i);
+    }
+    for(int i=0;i<Packets.size();i++){
       _grid->StencilSendToRecvFromBegin(MpiReqs,
 					Packets[i].send_buf,
 					Packets[i].to_rank,Packets[i].do_send,

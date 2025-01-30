@@ -27,10 +27,22 @@ export MPICH_OFI_NIC_POLICY=GPU
 #export MPIR_CVAR_CH4_OFI_GPU_PIPELINE_NUM_BUFFERS_PER_CHUNK=16
 #export MPIR_CVAR_CH4_OFI_GPU_PIPELINE_MAX_NUM_BUFFERS=16
 
+#
+# Local vol 16.16.16.32
+#
+
+#VOL=32.64.64.96
+
+for VOL in 32.32.32.96 32.64.64.96
+do
+for AT in 32
+do
 CMD="mpiexec -np 24 -ppn 12  -envall \
-	     ./gpu_tile.sh ./Benchmark_dwf_fp32 --mpi 2.2.2.3 --grid 32.64.64.96 \
-		--shm-mpi 0 --shm 2048 --device-mem 32000 --accelerator-threads 8 "
+	     ./gpu_tile.sh ./Benchmark_dwf_fp32 --mpi 2.2.2.3 --grid $VOL \
+		--shm-mpi 0 --shm 2048 --device-mem 32000 --accelerator-threads $AT --comms-overlap "
 
 echo $CMD
 $CMD
+done
+done
 
