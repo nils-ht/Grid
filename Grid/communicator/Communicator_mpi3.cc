@@ -408,8 +408,7 @@ double CartesianCommunicator::StencilSendToRecvFromPrepare(std::vector<CommsRequ
 {
   return 0.0; // Do nothing -- no preparation required
 }
-double CartesianCommunicator::StencilSendToRecvFromBegin(int list_idx,
-							 std::vector<CommsRequest_t> &list,
+double CartesianCommunicator::StencilSendToRecvFromBegin(std::vector<CommsRequest_t> &list,
 							 void *xmit,
 							 int dest,int dox,
 							 void *recv,
@@ -470,6 +469,7 @@ void CartesianCommunicator::StencilSendToRecvFromComplete(std::vector<CommsReque
   int ierr = MPI_Waitall(nreq,&list[0],&status[0]);
   assert(ierr==0);
   list.resize(0);
+  this->StencilBarrier(); 
 }
 
 #else /* NOT     ... ACCELERATOR_AWARE_MPI */
@@ -481,10 +481,10 @@ void CartesianCommunicator::StencilSendToRecvFromComplete(std::vector<CommsReque
    * PHASE 1: (prepare)
    * - post MPI receive buffers asynch
    * - post device - host send buffer transfer asynch
-   * - post device - device transfers
    * PHASE 2: (Begin)
    * - complete all copies
    * - post MPI send asynch
+   * - post device - device transfers
    * PHASE 3: (Complete)
    * - MPI_waitall
    * - host-device transfers
@@ -561,6 +561,8 @@ double CartesianCommunicator::StencilSendToRecvFromPrepare(std::vector<CommsRequ
   
   if (dox) {
     if ( (gdest == MPI_UNDEFINED) || Stencil_force_mpi ) {
+#undef DEVICE_TO_HOST_CONCURRENT // pipeline
+#ifdef DEVICE_TO_HOST_CONCURRENT
       tag= dir+_processor*32;
 
       host_xmit = this->HostBufferMalloc(xbytes);
@@ -577,11 +579,30 @@ double CartesianCommunicator::StencilSendToRecvFromPrepare(std::vector<CommsRequ
       srq.host_buf   = host_xmit;
       srq.device_buf = xmit;
       list.push_back(srq);
+#else
+      tag= dir+_processor*32;
 
-    } else {
-      void *shm = (void *) this->ShmBufferTranslate(dest,recv);
-      assert(shm!=NULL);
-      acceleratorCopyDeviceToDeviceAsynch(xmit,shm,xbytes);
+      host_xmit = this->HostBufferMalloc(xbytes);
+      const int chunks=1;
+      for(int n=0;n<chunks;n++){
+	void * host_xmitc = (void *)( (uint64_t) host_xmit + n*xbytes/chunks);
+	void * xmitc      = (void *)( (uint64_t) xmit      + n*xbytes/chunks);
+	acceleratorCopyFromDeviceAsynch(xmitc, host_xmitc,xbytes/chunks); // Make this Asynch
+      }
+      acceleratorCopySynchronise(); // Complete all pending copy transfers
+      
+      ierr =MPI_Isend(host_xmit, xbytes, MPI_CHAR,dest,tag,communicator_halo[commdir],&xrq);
+      assert(ierr==0);
+      off_node_bytes+=xbytes;
+
+      CommsRequest_t srq;
+      srq.PacketType = InterNodeXmit;
+      srq.bytes      = xbytes;
+      srq.req        = xrq;
+      srq.host_buf   = host_xmit;
+      srq.device_buf = xmit;
+      list.push_back(srq);
+#endif
     }
   }
 
@@ -623,17 +644,17 @@ double CartesianCommunicator::StencilSendToRecvFromBegin(std::vector<CommsReques
    * - complete all copies
    * - post MPI send asynch
    */
-  acceleratorCopySynchronise();
 
-  static int printed;
-  if(!printed && this->IsBoss() ) {
-    printf("dir %d doX %d doR %d Face size %ld %ld\n",dir,dox,dor,xbytes,rbytes);
-    printed=1;
-  }
+  //  static int printed;
+  //  if((printed<8) && this->IsBoss() ) {
+  //    printf("dir %d doX %d doR %d Face size %ld %ld\n",dir,dox,dor,xbytes,rbytes);
+  //    printed++;
+  //  }
   
   if (dox) {
 
     if ( (gdest == MPI_UNDEFINED) || Stencil_force_mpi ) {
+#ifdef DEVICE_TO_HOST_CONCURRENT
       tag= dir+_processor*32;
       // Find the send in the prepared list
       int list_idx=-1;
@@ -652,7 +673,12 @@ double CartesianCommunicator::StencilSendToRecvFromBegin(std::vector<CommsReques
       assert(ierr==0);
       list[list_idx].req        = xrq; // Update the MPI request in the list
       off_node_bytes+=xbytes;
-    } 
+#endif      
+    } else {
+      void *shm = (void *) this->ShmBufferTranslate(dest,recv);
+      assert(shm!=NULL);
+      acceleratorCopyDeviceToDeviceAsynch(xmit,shm,xbytes);
+    }
   }
   return off_node_bytes;
 }
@@ -680,6 +706,7 @@ void CartesianCommunicator::StencilSendToRecvFromComplete(std::vector<CommsReque
   acceleratorCopySynchronise(); // Complete all pending copy transfers
   list.resize(0);               // Delete the list
   this->HostBufferFreeAll();    // Clean up the buffer allocs
+  this->StencilBarrier(); 
 }
 #endif
 ////////////////////////////////////////////

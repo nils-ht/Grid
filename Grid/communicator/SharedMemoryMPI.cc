@@ -543,6 +543,9 @@ void GlobalSharedMemory::SharedMemoryAllocate(uint64_t bytes, int flags)
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef ACCELERATOR_AWARE_MPI
   printf("Host buffer allocate for GPU non-aware MPI\n");
+#if 0
+  HostCommBuf= acceleratorAllocHost(bytes);
+#else 
   HostCommBuf= malloc(bytes); /// CHANGE THIS TO malloc_host
 #ifdef HAVE_NUMAIF_H
   #warning "Moving host buffers to specific NUMA domain"
@@ -569,6 +572,8 @@ void GlobalSharedMemory::SharedMemoryAllocate(uint64_t bytes, int flags)
   }
 #endif  
   acceleratorPin(HostCommBuf,bytes);
+#endif  
+
 #endif  
   ShmCommBuf = acceleratorAllocDevice(bytes);
   if (ShmCommBuf == (void *)NULL ) {

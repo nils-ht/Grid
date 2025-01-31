@@ -332,7 +332,8 @@ void WilsonFermion5D<Impl>::DhopInternalOverlappedComms(StencilImpl & st,
   
   //  std::cout << " WilsonFermion5D Communicate Begin " <<std::endl;
   std::vector<std::vector<CommsRequest_t> > requests;
-#ifndef GRID_ACCELERATED
+
+#if 1
   /////////////////////////////
   // Overlap with comms
   /////////////////////////////
@@ -352,7 +353,8 @@ void WilsonFermion5D<Impl>::DhopInternalOverlappedComms(StencilImpl & st,
     Kernels::DhopKernel   (Opt,st,U,st.CommBuf(),LLs,U.oSites(),in,out,1,0);
   }
   
-#ifdef GRID_ACCELERATED
+  //ifdef GRID_ACCELERATED
+#if 0
   /////////////////////////////
   // Overlap with comms -- on GPU the interior kernel call is nonblocking
   /////////////////////////////

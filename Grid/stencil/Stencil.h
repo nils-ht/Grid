@@ -376,6 +376,7 @@ public:
 					  Packets[i].from_rank,Packets[i].do_recv,
 					  Packets[i].xbytes,Packets[i].rbytes,i);
     }
+    acceleratorCopySynchronise();
     for(int i=0;i<Packets.size();i++){
       _grid->StencilSendToRecvFromBegin(MpiReqs,
 					Packets[i].send_buf,
@@ -401,7 +402,6 @@ public:
     else DslashLogFull();
     //    acceleratorCopySynchronise();// is in the StencilSendToRecvFromComplete
     //    accelerator_barrier(); 
-    _grid->StencilBarrier(); 
     for(int i=0;i<Packets.size();i++){
       if ( Packets[i].do_recv )
 	FlightRecorder::recvLog(Packets[i].recv_buf,Packets[i].rbytes,Packets[i].from_rank);
