@@ -50,12 +50,16 @@ typedef MPI_Request MpiCommsRequest_t;
 #ifdef ACCELERATOR_AWARE_MPI
 typedef MPI_Request CommsRequest_t;
 #else
-enum PacketType_t { InterNodeXmit, InterNodeRecv, IntraNodeXmit, IntraNodeRecv };
+enum PacketType_t { InterNodeXmit, InterNodeRecv, IntraNodeXmit, IntraNodeRecv, InterNodeXmitISend, InterNodeReceiveHtoD };
 typedef struct {
   PacketType_t PacketType;
   void *host_buf;
   void *device_buf;
+  int dest;
+  int tag;
+  int commdir;
   unsigned long bytes;
+  acceleratorEvent_t ev;
   MpiCommsRequest_t req;
 } CommsRequest_t;
 #endif

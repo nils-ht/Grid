@@ -343,9 +343,26 @@ inline void acceleratorFreeDevice(void *ptr){free(ptr,*theGridAccelerator);};
 
 inline void acceleratorCopySynchronise(void) {  theCopyAccelerator->wait(); }
 
-inline void acceleratorCopyDeviceToDeviceAsynch(void *from,void *to,size_t bytes)  {  theCopyAccelerator->memcpy(to,from,bytes);}
-inline void acceleratorCopyToDeviceAsynch(void *from,void *to,size_t bytes)  { theCopyAccelerator->memcpy(to,from,bytes); }
-inline void acceleratorCopyFromDeviceAsynch(void *from,void *to,size_t bytes){ theCopyAccelerator->memcpy(to,from,bytes); }
+
+///////
+// Asynch event interface
+///////
+typedef sycl::event acceleratorEvent_t;
+
+inline void acceleratorEventWait(acceleratorEvent_t ev)
+{
+  ev.wait();
+}
+
+inline int acceleratorEventIsComplete(acceleratorEvent_t ev)
+{
+  return (ev.get_info<sycl::info::event::command_execution_status>() == sycl::info::event_command_status::complete);
+}
+
+inline acceleratorEvent_t acceleratorCopyDeviceToDeviceAsynch(void *from,void *to,size_t bytes)  { return theCopyAccelerator->memcpy(to,from,bytes);}
+inline acceleratorEvent_t acceleratorCopyToDeviceAsynch(void *from,void *to,size_t bytes)        { return theCopyAccelerator->memcpy(to,from,bytes); }
+inline acceleratorEvent_t acceleratorCopyFromDeviceAsynch(void *from,void *to,size_t bytes)      { return theCopyAccelerator->memcpy(to,from,bytes); }
+
 inline void acceleratorCopyToDevice(void *from,void *to,size_t bytes)  { theCopyAccelerator->memcpy(to,from,bytes); theCopyAccelerator->wait();}
 inline void acceleratorCopyFromDevice(void *from,void *to,size_t bytes){ theCopyAccelerator->memcpy(to,from,bytes); theCopyAccelerator->wait();}
 inline void acceleratorMemSet(void *base,int value,size_t bytes) { theCopyAccelerator->memset(base,value,bytes); theCopyAccelerator->wait();}
@@ -358,7 +375,9 @@ inline int  acceleratorIsCommunicable(void *ptr)
   else return 0;
 #endif
   return 1;
+
 }
+
 
 #endif
 
