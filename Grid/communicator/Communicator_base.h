@@ -33,6 +33,8 @@ Author: Peter Boyle <paboyle@ph.ed.ac.uk>
 ///////////////////////////////////
 #include <Grid/communicator/SharedMemory.h>
 
+#define NVLINK_GET
+
 NAMESPACE_BEGIN(Grid);
 
 extern bool Stencil_force_mpi ;
