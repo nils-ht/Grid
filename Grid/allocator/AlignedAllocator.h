@@ -175,7 +175,7 @@ template<typename _Tp>  inline bool operator!=(const devAllocator<_Tp>&, const d
 // Template typedefs
 ////////////////////////////////////////////////////////////////////////////////
 template<class T> using hostVector          = std::vector<T,alignedAllocator<T> >;           // Needs autoview
-template<class T> using Vector              = std::vector<T,uvmAllocator<T> >;               // 
+template<class T> using Vector              = std::vector<T,uvmAllocator<T> >;               // Really want to deprecate
 template<class T> using uvmVector           = std::vector<T,uvmAllocator<T> >;               // auto migrating page
 template<class T> using deviceVector        = std::vector<T,devAllocator<T> >;               // device vector
 
