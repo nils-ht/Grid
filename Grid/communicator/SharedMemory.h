@@ -50,7 +50,21 @@ typedef MPI_Request MpiCommsRequest_t;
 #ifdef ACCELERATOR_AWARE_MPI
 typedef MPI_Request CommsRequest_t;
 #else
-enum PacketType_t { InterNodeXmit, InterNodeRecv, IntraNodeXmit, IntraNodeRecv, InterNodeXmitISend, InterNodeReceiveHtoD };
+/*
+ * Enable state transitions as each packet flows.
+ */
+enum PacketType_t {
+  FaceGather,
+  InterNodeXmit,
+  InterNodeRecv,
+  IntraNodeXmit,
+  IntraNodeRecv,
+  InterNodeXmitISend,
+  InterNodeReceiveHtoD
+};
+/*
+ *Package arguments needed for various actions along packet flow
+ */
 typedef struct {
   PacketType_t PacketType;
   void *host_buf;
